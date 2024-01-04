@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Keyword Grouping</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        textarea,
+        input,
+        button {
+            margin-bottom: 10px;
+        }
+
+        .keywordSet {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        .keywordSet label,
+        .keywordSet input,
+        .keywordSet button {
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .keywordSet button {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 70%; /* Allocate 70% width for the table */
+            float: left;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        th.groupNameHeader,
+        #resultTable,
+        #resultHeading,
+        #copyButton,
+        #donutChart {
+            display: none;
+        }
+
+        .chart-container {
+            width: 25%; /* Allocate 25% width for the chart */
+            float: left;
+            margin-top: 20px;
+            text-align: center;
+            margin-right: 5%; /* Add 5% space between the chart and the table */
+        }
+
+        canvas#donutChart {
+            width: 100%; /* Set chart width to 100% */
+            height: auto;
+            max-width: 400px; /* Set max-width for responsiveness */
+            max-height: 400px; /* Set max-height for responsiveness */
+            display: inline-block;
+        }
+
+        #copyButton {
+            display: none;
+            margin-bottom: 10px;
+            margin-top: 20px;
+            clear: both;
+        }
+		
+		#buttonContainer {
+            margin-top: 10px;
+            position: relative;
+            display: none; /* Initially hide the button container */
+        }
+		
+		.searchContainer {
+            position: relative;
+        }
+
+        #searchInput {
+            padding-right: 30px; /* Adjust the padding to make space for the close icon */
+        }
+
+        #closeIcon {
+            position: absolute;
+			top: 50%;
+			transform: translateY(-50%);
+			right: 130px;
+			cursor: pointer;
+			display: none;
+			margin-top: 3px;
+        }
+		
+		#totalKeywords,
+		#duplicateKeywords {
+			display: none;
+		}
+		
+		#groupFilter {
+            margin-bottom: 10px;
+        }
+	</style>
+</head>
+
+<body>
+
+    <h2>SEO Keyword Grouping</h2>
+
+    <label for="keywordsInput">Enter Keywords (one per line): </label>
+    <textarea id="keywordsInput" placeholder="e.g., SEO\nkeywords\noptimization"></textarea>
+
+    <div id="keywordSets">
+        <div class="keywordSet">
+            <label for="containsKeywordInput1">Check for Keywords (comma-separated): </label>
+            <input type="text" class="containsKeywordInput" placeholder="e.g., SEO, optimization">
+
+            <label for="groupNameInput1">Group Name: </label>
+            <input type="text" class="groupNameInput" placeholder="e.g., Group1">
+
+            <button onclick="removeKeywordSet(this)">Remove</button>
+        </div>
+    </div>
+
+    <button id="addKeywordSet" onclick="addKeywordSet()">Add</button>
+    <button onclick="generateSeoTags()">Generate SEO Tags</button>
+
+    <h3 id="resultHeading">Result:</h3>
+
+    
+
+    <!-- Move the Copy to Clipboard button above the table -->
+    <!-- <button id="copyButton" onclick="copyToClipboard()">Copy to Clipboard</button> -->
+
+    <div class="chart-container">
+        <!-- Center-align the smaller chart -->
+        <canvas id="donutChart"></canvas>
+    </div>
+
+    <div style="text-align: right; margin-top: 10px;">
+		<span id="buttonContainer" class="searchContainer">
+		<label for="duplicateFilter">Filter by Duplicate:</label>
+		<select id="duplicateFilter" onchange="filterTable()">
+			<option value="all">All Keywords</option>
+			<option value="duplicates">Duplicate Keywords</option>
+		</select>
+			<label for="groupFilter">Filter by Group:</label>
+			<select id="groupFilter" onchange="filterTable()">
+				<option value="all">All Groups</option>
+			</select>
+            <input type="text" id="searchInput" placeholder="Search Keywords" oninput="filterTable()">
+            <span id="closeIcon" onclick="clearSearchInput()">&#10006;</span>
+            <button id="copyButton" onclick="copyToClipboard()">Copy to Clipboard</button>
+        </span>
+    </div>
+
+    <div id="tableContainer" style="max-height: 400px; overflow-y: auto; margin: 0; padding: 0; border: 0; box-sizing: content-box;">
+		<!-- Add these paragraphs for displaying counts -->
+		<p id="totalKeywords" style="display: none; margin-right: 20px; float: left;">Total Keywords: 0</p>
+		<p id="duplicateKeywords" style="display: none; margin-right: 20px; float: left;">Duplicate Keywords: 0</p>
+        <table id="resultTable" style="width: 100%; margin: 0; padding: 0; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>Input</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody id="resultTableBody"></tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        var generateButtonClicked = false;
+    var myChart;
+    var copyButton = document.getElementById('copyButton');
+
+    document.getElementById('keywordsInput').addEventListener('input', function () {
+        if (generateButtonClicked) {
+            generateSeoTags();
+        }
+    });
+
+    document.getElementById('addKeywordSet').addEventListener('click', addKeywordSet);
+
+    var addingKeywordSet = false;
+
+    function addKeywordSet() {
+        if (addingKeywordSet) {
+            return;
+        }
+
+        addingKeywordSet = true;
+
+        var keywordSetsContainer = document.getElementById('keywordSets');
+
+        var newKeywordSet = document.createElement('div');
+        newKeywordSet.className = 'keywordSet';
+
+        var setIndex = keywordSetsContainer.children.length + 1;
+
+        var containsLabel = document.createElement('label');
+        containsLabel.setAttribute('for', 'containsKeywordInput' + setIndex);
+        containsLabel.textContent = 'Check for Keywords ' + setIndex + ' (comma-separated): ';
+        newKeywordSet.appendChild(containsLabel);
+
+        var containsInput = document.createElement('input');
+        containsInput.type = 'text';
+        containsInput.className = 'containsKeywordInput';
+        containsInput.setAttribute('placeholder', 'e.g., keyword1, keyword2');
+        newKeywordSet.appendChild(containsInput);
+
+        var groupNameLabel = document.createElement('label');
+        groupNameLabel.setAttribute('for', 'groupNameInput' + setIndex);
+        groupNameLabel.textContent = 'Group Name ' + setIndex + ': ';
+        newKeywordSet.appendChild(groupNameLabel);
+
+        var groupNameInput = document.createElement('input');
+        groupNameInput.type = 'text';
+        groupNameInput.className = 'groupNameInput';
+        groupNameInput.setAttribute('placeholder', 'e.g., Group' + setIndex);
+        newKeywordSet.appendChild(groupNameInput);
+
+        var removeButton = document.createElement('button');
+        removeButton.textContent = 'Remove';
+        removeButton.onclick = function () {
+            removeKeywordSet(this);
+        };
+        newKeywordSet.appendChild(removeButton);
+
+        keywordSetsContainer.appendChild(newKeywordSet);
+
+        // Delay re-enabling the button to the end of the execution context
+        setTimeout(function () {
+            addingKeywordSet = false;
+            populateGroupDropdown(); // Update the group dropdown after adding a keyword set
+        }, 0);
+    }
+
+    function removeKeywordSet(button) {
+        var keywordSet = button.parentElement;
+        keywordSet.parentElement.removeChild(keywordSet);
+        populateGroupDropdown(); // Update the group dropdown after removing a keyword set
+    }
+
+    function populateGroupDropdown() {
+        var dropdown = document.getElementById('groupFilter');
+        dropdown.innerHTML = '<option value="all">All Groups</option>';
+
+        var keywordSets = document.querySelectorAll('.keywordSet');
+        var groupSet = new Set();
+
+        keywordSets.forEach(keywordSet => {
+            var groupNameInput = keywordSet.querySelector('.groupNameInput');
+            if (groupNameInput) {
+                var groupName = groupNameInput.value.trim();
+                if (groupName !== '') {
+                    groupSet.add(groupName);
+                }
+            }
+        });
+
+        var userGroups = Array.from(document.querySelectorAll('.groupNameInput')).map(input => input.value.trim());
+        userGroups.forEach(group => groupSet.add(group));
+
+        groupSet.forEach(group => {
+            var option = document.createElement('option');
+            option.value = group;
+            option.textContent = group;
+            dropdown.appendChild(option);
+        });
+    }
+
+        function generateSeoTags() {
+            var resultHeading = document.getElementById('resultHeading');
+            var resultTable = document.getElementById('resultTable');
+            var resultTableBody = document.getElementById('resultTableBody');
+            var donutChart = document.getElementById('donutChart');
+			
+			// Show the button container after clicking the Generate SEO Tags button
+            document.getElementById('buttonContainer').style.display = 'inline-block';
+
+            // Show the Copy to Clipboard button after clicking the Generate SEO Tags button
+            copyButton.style.display = 'inline-block';
+
+            resultTableBody.innerHTML = '';
+            resultHeading.style.display = 'none';
+            resultTable.style.display = 'none';
+
+            var userInput = document.getElementById('keywordsInput').value;
+            var keywordsArray = Array.from(new Set(userInput.split('\n').map(keyword => keyword.trim()).filter(keyword => keyword !== '')));
+
+            var keywordSets = document.querySelectorAll('.keywordSet');
+            var containsKeywordGroupSet = new Set();
+            var validInputs = true;
+
+            keywordsArray.forEach(keyword => {
+                var addedToResult = false;
+
+                keywordSets.forEach((keywordSet, setIndex) => {
+                    var containsKeywordsInput = keywordSet.querySelector('.containsKeywordInput');
+                    var groupNameInput = keywordSet.querySelector('.groupNameInput');
+
+                    if (containsKeywordsInput && groupNameInput) {
+                        var containsKeywordsArray = containsKeywordsInput.value.split(',').map(keyword => keyword.trim());
+                        containsKeywordsArray = containsKeywordsArray.filter(keyword => keyword !== '');
+                        var groupName = groupNameInput.value;
+
+                        if (containsKeywordsArray.length > 0 && groupName.trim() !== '') {
+                            if (containsKeywordsArray.some(checkKeyword => keyword.includes(checkKeyword))) {
+                                var key = keyword + '|' + groupName;
+
+                                if (!containsKeywordGroupSet.has(key)) {
+                                    containsKeywordGroupSet.add(key);
+                                    var row = '<tr><td>' + keyword + '</td><td>' + groupName + '</td></tr>';
+                                    resultTableBody.innerHTML += row;
+                                    addedToResult = true;
+                                }
+                            }
+                        } else {
+                            validInputs = false;
+                        }
+                    }
+                });
+
+                if (!addedToResult) {
+                    var key = keyword + '|Other';
+
+                    if (!containsKeywordGroupSet.has(key)) {
+                        containsKeywordGroupSet.add(key);
+                        var row = '<tr><td>' + keyword + '</td><td>Other</td></tr>';
+                        resultTableBody.innerHTML += row;
+                    }
+                }
+            });
+
+            if (!validInputs) {
+                alert('Please provide values for all visible inputs.');
+            } else {
+                resultHeading.style.display = 'block';
+                resultTable.style.display = 'table';
+                drawDonutChart();
+            }
+
+            // Calculate and display counts
+			var totalKeywords = resultTableBody.querySelectorAll('tr').length;
+			var duplicateKeywords = findDuplicateKeywords(resultTableBody);
+			document.getElementById('totalKeywords').textContent = "Total Keywords: " + totalKeywords;
+			document.getElementById('duplicateKeywords').textContent = "Duplicate Keywords: " + duplicateKeywords;
+
+			// Show the counts
+			document.getElementById('totalKeywords').style.display = 'block';
+			document.getElementById('duplicateKeywords').style.display = 'block';
+			
+			// Call populateGroupDropdown after generating SEO tags to ensure any changes in groups are reflected in the dropdown
+			populateGroupDropdown();
+        }
+
+		// Corrected findDuplicateKeywords function
+		function findDuplicateKeywords(tableBody) {
+			var duplicateKeywords = 0;
+			var keywordsSet = new Set();
+
+			tableBody.querySelectorAll('tr').forEach(row => {
+				var keyword = row.children[0].textContent.trim(); // Assuming keyword is in the first column
+				if (keywordsSet.has(keyword)) {
+					duplicateKeywords++;
+				} else {
+					keywordsSet.add(keyword);
+				}
+			});
+
+			return duplicateKeywords;
+		}
+
+        function drawDonutChart() {
+            var resultTableBody = document.getElementById('resultTableBody');
+            var groupCount = {};
+
+            resultTableBody.querySelectorAll('tr').forEach(row => {
+                var groupName = row.children[1].textContent;
+                groupCount[groupName] = (groupCount[groupName] || 0) + 1;
+            });
+
+            var labels = Object.keys(groupCount);
+            var data = Object.values(groupCount);
+
+            var ctx = document.getElementById('donutChart');
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            ctx = ctx.getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true
+                    },
+                    legend: {
+                        position: 'right'
+                    },
+                    plugins: {
+                        datalabels: {
+                            formatter: (value, ctx) => {
+                                let sum = 0;
+                                let dataArr = ctx.chart.data.datasets[0].data;
+                                dataArr.map(data => {
+                                    sum += data;
+                                });
+                                let percentage = ((value * 100) / sum).toFixed(2) + '%';
+                                return percentage;
+                            },
+                            color: '#fff',
+                            labels: {
+                                title: {
+                                    font: {
+                                        size: '16'
+                                    }
+                                }
+                            },
+                            display: 'auto',
+                            opacity: 1,
+                            align: 'end',
+                            anchor: 'end'
+                        }
+                    }
+                }
+            });
+        }
+
+        function copyToClipboard() {
+			var resultTable = document.getElementById('resultTableBody');
+			var visibleRows = getVisibleRows(resultTable);
+			var resultText = '';
+
+			visibleRows.forEach(row => {
+				row.querySelectorAll('td').forEach((cell, index) => {
+					resultText += cell.textContent;
+					if (index < row.cells.length - 1) {
+						resultText += '\t';
+					}
+				});
+				resultText += '\n';
+			});
+
+			var textarea = document.createElement('textarea');
+			textarea.value = resultText;
+			document.body.appendChild(textarea);
+
+			textarea.select();
+			document.execCommand('copy');
+
+			document.body.removeChild(textarea);
+
+			alert('Visible table content copied to clipboard.');
+		}
+
+		function getVisibleRows(tableBody) {
+			var visibleRows = [];
+			tableBody.querySelectorAll('tr').forEach(row => {
+				if (row.style.display !== 'none') {
+					visibleRows.push(row);
+				}
+			});
+			return visibleRows;
+		}
+		
+		// Function to populate the group dropdown
+    function populateGroupDropdown() {
+        var dropdown = document.getElementById('groupFilter');
+        dropdown.innerHTML = '<option value="all">All Groups</option>';
+
+        var keywordSets = document.querySelectorAll('.keywordSet');
+        var groupSet = new Set();
+
+        // Include groups from the initial set
+        keywordSets.forEach(keywordSet => {
+            var groupNameInput = keywordSet.querySelector('.groupNameInput');
+            if (groupNameInput) {
+                var groupName = groupNameInput.value.trim();
+                if (groupName !== '') {
+                    groupSet.add(groupName);
+                }
+            }
+        });
+
+        // Include groups entered by users
+        var userGroups = Array.from(document.querySelectorAll('.groupNameInput')).map(input => input.value.trim());
+        userGroups.forEach(group => groupSet.add(group));
+
+        // Populate the dropdown with unique group names
+        groupSet.forEach(group => {
+            var option = document.createElement('option');
+            option.value = group;
+            option.textContent = group;
+            dropdown.appendChild(option);
+        });
+    }
+
+    // Call the function to populate the dropdown initially
+    populateGroupDropdown();
+		
+		function filterTable() {
+    var input, filter, table, tbody, tr, td, i, txtValue, groupFilter, duplicateFilter;
+    input = document.getElementById("searchInput");
+    filter = input.value.toUpperCase();
+    table = document.getElementById("resultTable");
+    tbody = document.getElementById("resultTableBody");
+    tr = tbody.getElementsByTagName("tr");
+    groupFilter = document.getElementById("groupFilter").value;
+    duplicateFilter = document.getElementById("duplicateFilter").value;
+
+    var visibleRowCount = 0;
+    var duplicateKeywords = 0;
+    var seenKeywords = new Set();
+
+    for (i = 0; i < tr.length; i++) {
+        td = tr[i].getElementsByTagName("td")[0]; // Assuming the keyword is in the first column
+        var groupTd = tr[i].getElementsByTagName("td")[1]; // Assuming the group is in the second column
+
+        if (td && groupTd) {
+            txtValue = td.textContent || td.innerText;
+            var groupValue = groupTd.textContent || groupTd.innerText;
+
+            // Display or hide rows based on the group filter
+            if (groupFilter === 'all' || groupFilter === 'all_groups' || groupFilter === groupValue) {
+                var key = txtValue.trim().toLowerCase() + '|' + groupValue.trim().toLowerCase();
+
+                if (seenKeywords.has(key) && duplicateFilter === 'duplicates') {
+                    tr[i].style.display = "";
+                    duplicateKeywords++;
+                } else if (!seenKeywords.has(key) && duplicateFilter === 'unique') {
+                    tr[i].style.display = "";
+                } else if (duplicateFilter === 'all') {
+                    tr[i].style.display = txtValue.toUpperCase().includes(filter) ? "" : "none";
+                } else {
+                    tr[i].style.display = "none";
+                }
+
+                seenKeywords.add(key);
+
+                // Update counts based on the visible rows
+                if (tr[i].style.display !== 'none') {
+                    visibleRowCount++;
+                }
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
+
+    // Display the updated counts
+    document.getElementById('totalKeywords').textContent = "Total Keywords: " + visibleRowCount;
+    document.getElementById('duplicateKeywords').textContent = "Duplicate Keywords: " + duplicateKeywords;
+}
+
+
+
+
+
+
+
+
+function isDuplicate(keyword, group, seenKeywords) {
+    var key = keyword.trim().toLowerCase() + '|' + group.trim().toLowerCase();
+    return seenKeywords.has(key);
+}
+
+
+
+
+
+		function clearSearchInput() {
+            document.getElementById('searchInput').value = '';
+            filterTable();
+            document.getElementById('closeIcon').style.display = 'none';
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function () {
+            filterTable();
+            var closeIcon = document.getElementById('closeIcon');
+            if (this.value.trim() !== '') {
+                closeIcon.style.display = 'inline-block';
+            } else {
+                closeIcon.style.display = 'none';
+            }
+        });
+    </script>
+
+</body>
+
+</html>
